@@ -1,0 +1,21 @@
+.audio-track-container {
+  display: flex;
+
+  margin: 0px;
+}
+
+.audio-track-container:focus {
+  border: 2px solid red;
+}
+.audio-track {
+  flex: 10;
+  padding: 20px 0;
+
+  border: 2px dashed #333;
+}
+
+.audio-track-controls {
+  flex: 1;
+  padding: 20px 0;
+  border: 2px dashed #333;
+}

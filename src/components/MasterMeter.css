@@ -1,0 +1,19 @@
+.master-meter {
+	display: inline-block;
+	position: relative
+}
+
+.meter-needle {
+	position: absolute;
+
+	bottom: 156px;
+	left: 232px;
+
+	width: 125px;
+	height: 160px;
+
+	background: url('../assets/vu-needle.png');
+
+	transform-origin: 100% 100%;
+	transition: transform .15s
+}
