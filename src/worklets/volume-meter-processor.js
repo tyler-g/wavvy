@@ -38,6 +38,7 @@ class VolumeMeter extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
+    console.log(inputs, outputs);
     // This example only handles mono channel.
     const inputChannelData = inputs[0][0];
 

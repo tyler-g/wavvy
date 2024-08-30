@@ -4,7 +4,7 @@ import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js"
 //import RecordPlugin from "wavesurfer.js/dist/plugins/record.esm.js"
 
 import useMixerStore from "../stores/Mixer"
-import { useShallow } from "zustand/react/shallow"
+import { useShallow, } from "zustand/react/shallow"
 
 import "./AudioTrack.css"
 
@@ -14,11 +14,12 @@ type AudioTrackProps = {
 
 function AudioTrack({ id }: AudioTrackProps) {
   console.log("AudioTrack render", id)
-  const [audioStream, setAudioStream] = useState<MediaStream | null>(null)
   const setTrackWaveSurfer = useMixerStore(state => state.setTrackWaveSurfer)
+  const setTrackSource = useMixerStore(state => state.setTrackSource)
   const setDb = useMixerStore(state => state.setDb)
   const removeTrack = useMixerStore(state => state.removeTrack)
-  const [tracks] = useMixerStore(useShallow(state => [state.tracks]))
+  const  [masterAudioContext] = useMixerStore(useShallow(state => [state.master.audioContext]))
+
   const trackWaveSurfer = useMixerStore(
     state => state.tracks.find(track => track.id === id)?.wavesurfer,
   )
@@ -48,7 +49,7 @@ function AudioTrack({ id }: AudioTrackProps) {
   }, [play])
 
   useEffect(() => {
-    console.log("useEffect AudioTrack", tracks)
+    console.log("create and set wavesurfer instance", id)
     const waveSurferInstance = WaveSurfer.create({
       url: "src/assets/StarWars60.wav",
       container: `#waveform-${id}`,
@@ -64,37 +65,38 @@ function AudioTrack({ id }: AudioTrackProps) {
     return () => {
       // cleanup
       removeTrack(id)
-      console.log("tracks after removeTrack", tracks)
+      console.log("tracks after removeTrack")
     }
   }, [])
 
-  useEffect(() => {
-    if (!audioStream) return
-    const audioContext = new AudioContext()
-    const streamSource = audioContext.createMediaStreamSource(audioStream)
-    // Loads module script via AudioWorklet.
-    audioContext.audioWorklet
-      .addModule("src/worklets/volume-meter-processor.js")
-      .then(async () => {
-        console.log("added module volume meter processor"!)
-        const volumeMeterNode = new AudioWorkletNode(
-          audioContext,
-          "volume-meter",
-        )
-        volumeMeterNode.port.onmessage = ({ data }) => {
-          setDb(data)
-        }
-        // connect chain
-        streamSource.connect(volumeMeterNode).connect(audioContext.destination)
-      })
-      .catch(err => {
-        console.log("could not add module my prcessor", err)
-      })
+  // useEffect(() => {
+  //   console.log('master audio context has been set'); return;
+  //   if (!audioStream) return
+  //   const audioContext = new AudioContext()
+  //    const streamSource = audioContext.createMediaStreamSource(audioStream)
+  //   // Loads module script via AudioWorklet.
+  //   audioContext.audioWorklet
+  //     .addModule("src/worklets/volume-meter-processor.js")
+  //     .then(async () => {
+  //       console.log("added module volume meter processor"!)
+  //       const volumeMeterNode = new AudioWorkletNode(
+  //         audioContext,
+  //         "volume-meter",
+  //       )
+  //       volumeMeterNode.port.onmessage = ({ data }) => {
+  //         setDb(data)
+  //       }
+  //       // connect chain
+  //       streamSource.connect(volumeMeterNode).connect(audioContext.destination)
+  //     })
+  //     .catch(err => {
+  //       console.log("could not add module my prcessor", err)
+  //     })
 
-    return () => {
-      // cleanup
-    }
-  }, [audioStream])
+  //   return () => {
+  //     // cleanup
+  //   }
+  // }, [test])
 
   async function record() {
     try {
@@ -103,7 +105,7 @@ function AudioTrack({ id }: AudioTrackProps) {
         video: false,
       })
 
-      setAudioStream(stream)
+      setTrackSource(id, stream)
     } catch (err) {
       console.error("could not get audio stream!", err)
     }
