@@ -1,105 +1,102 @@
-import { useEffect, useRef, useState } from "react"
-import WaveSurfer from "wavesurfer.js"
-import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js"
+import { useEffect, useRef } from 'react';
+import WaveSurfer from 'wavesurfer.js';
+import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js';
 //import RecordPlugin from "wavesurfer.js/dist/plugins/record.esm.js"
 
-import useMixerStore from "../stores/Mixer"
-import { useShallow } from "zustand/react/shallow"
+import useMixerStore from '../stores/Mixer';
 
-import "./AudioTrack.css"
+import './AudioTrack.css';
 
 type AudioTrackProps = {
-  id: number
-}
+  id: number;
+};
 
 function AudioTrack({ id }: AudioTrackProps) {
-  console.log("AudioTrack render", id)
-  const setTrackWaveSurfer = useMixerStore(state => state.setTrackWaveSurfer)
-  const setTrackSource = useMixerStore(state => state.setTrackSource)
-
-  const removeTrack = useMixerStore(state => state.removeTrack)
-  const  [masterAudioContext] = useMixerStore(useShallow(state => [state.master.audioContext]))
+  console.log('AudioTrack render', id);
+  const setTrackWaveSurfer = useMixerStore((state) => state.setTrackWaveSurfer);
+  const setTrackSource = useMixerStore((state) => state.setTrackSource);
+  const removeTrack = useMixerStore((state) => state.removeTrack);
 
   const trackWaveSurfer = useMixerStore(
-    state => state.tracks.find(track => track.id === id)?.wavesurfer,
-  )
+    (state) => state.tracks.find((track) => track.id === id)?.wavesurfer
+  );
 
-  const containerRef = useRef<HTMLElement>(null)
+  const containerRef = useRef<HTMLElement>(null);
 
-  const plugins: any = []
+  const plugins: any = [];
   plugins.push(
     TimelinePlugin.create({
       container: `#waveform-timeline-${id}`,
-    }),
-  )
+    })
+  );
 
   // bind keypress listener not to window but to the container of this specific track
   useEffect(() => {
-    const refForCleanup = containerRef.current
+    const refForCleanup = containerRef.current;
     const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.code === "Space") {
-        event.preventDefault()
-        playPause()
+      if (event.code === 'Space') {
+        event.preventDefault();
+        playPause();
       }
-    }
-    containerRef.current?.addEventListener("keydown", handleKeyPress)
+    };
+    containerRef.current?.addEventListener('keydown', handleKeyPress);
     return () => {
-      refForCleanup?.removeEventListener("keydown", handleKeyPress)
-    }
-  }, [play])
+      refForCleanup?.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [play]);
 
   useEffect(() => {
-    console.log("create and set wavesurfer instance", id)
+    console.log('create and set wavesurfer instance', id);
     const waveSurferInstance = WaveSurfer.create({
-      url: "src/assets/StarWars60.wav",
+      url: 'src/assets/StarWars60.wav',
       backend: 'WebAudio',
       container: `#waveform-${id}`,
-      waveColor: "#47B784",
+      waveColor: '#47B784',
       //progressColor: "#EB9D9C",
-      progressColor: "#CAAEEB",
+      progressColor: '#CAAEEB',
       autoCenter: true,
       interact: true,
       fillParent: true,
-    })
-    setTrackWaveSurfer(id, waveSurferInstance)
+    });
+    setTrackWaveSurfer(id, waveSurferInstance);
     return () => {
       // cleanup
-    }
-  }, [])
+    };
+  }, []);
 
   async function record() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
-      })
+      });
 
-      setTrackSource(id, stream)
+      setTrackSource(id, stream);
     } catch (err) {
-      console.error("could not get audio stream!", err)
+      console.error('could not get audio stream!', err);
     }
   }
 
   async function playPause() {
-    trackWaveSurfer?.playPause()
+    trackWaveSurfer?.playPause();
   }
   async function play() {
-    console.log("play", trackWaveSurfer)
-    trackWaveSurfer?.play()
+    console.log('play', trackWaveSurfer);
+    trackWaveSurfer?.play();
   }
 
   async function pause() {
-    console.log("pause")
-    trackWaveSurfer?.pause()
+    console.log('pause');
+    trackWaveSurfer?.pause();
   }
 
   async function stop() {
-    console.log("stop")
-    trackWaveSurfer?.stop()
+    console.log('stop');
+    trackWaveSurfer?.stop();
   }
 
   function handleContainerFocus() {
-    console.log("container focused!", id)
+    console.log('container focused!', id);
   }
 
   return (
@@ -110,6 +107,7 @@ function AudioTrack({ id }: AudioTrackProps) {
         ref={containerRef}
         onFocus={handleContainerFocus}
       >
+        <span>{id} </span>
         <div className="audio-track-controls">
           <button onClick={record} tabIndex={-1}>
             rec
@@ -123,7 +121,7 @@ function AudioTrack({ id }: AudioTrackProps) {
           <button onClick={stop} tabIndex={-1}>
             stop
           </button>
-          <button onClick={() => removeTrack({id})} tabIndex={-1}>
+          <button onClick={() => removeTrack({ id })} tabIndex={-1}>
             remove
           </button>
         </div>
@@ -134,7 +132,7 @@ function AudioTrack({ id }: AudioTrackProps) {
         </div>
       </div>
     </>
-  )
+  );
 }
 
-export default AudioTrack
+export default AudioTrack;

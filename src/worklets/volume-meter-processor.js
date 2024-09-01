@@ -15,7 +15,6 @@ const FRAME_INTERVAL = 1 / FRAME_PER_SECOND;
  * @extends AudioWorkletProcessor
  */
 class VolumeMeter extends AudioWorkletProcessor {
-
   constructor() {
     super();
     this._lastUpdate = currentTime;
@@ -38,7 +37,7 @@ class VolumeMeter extends AudioWorkletProcessor {
     this._db = db;
   }
 
-  process(inputs, outputs) {
+  process(inputs) {
     if (!inputs) return;
     // This example only handles mono channel.
     const inputChannelData = inputs[0][0];
@@ -54,4 +53,4 @@ class VolumeMeter extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor("volume-meter", VolumeMeter);
+registerProcessor('volume-meter', VolumeMeter);

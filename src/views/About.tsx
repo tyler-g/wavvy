@@ -1,14 +1,14 @@
-import { useEffect } from "react"
+import { useEffect } from 'react';
 
 const About = () => {
   useEffect(() => {
-    console.log("about")
+    console.log('about');
     window.scrollTo({
       top: 5000,
       left: 0,
-      behavior: "smooth",
-    })
-  }, [])
+      behavior: 'smooth',
+    });
+  }, []);
 
   return (
     <div className="container mx-auto sm">
@@ -21,7 +21,7 @@ const About = () => {
       <p>This is a rewrite in Typescript and latest stable technologies</p>
       <p>Stack: ReactJS + TypeScript + Vite + PeerJS + ReactQuery</p>
     </div>
-  )
-}
+  );
+};
 
-export default About
+export default About;
