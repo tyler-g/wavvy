@@ -5,6 +5,9 @@ import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js';
 
 import useMixerStore from '../stores/Mixer';
 
+import { sendCmdToAllRemotePeers } from '../utils/peer-utils';
+
+import sampleWav from '../assets/StarWars60.wav';
 import './AudioTrack.css';
 
 type AudioTrackProps = {
@@ -21,7 +24,7 @@ function AudioTrack({ id }: AudioTrackProps) {
     (state) => state.tracks.find((track) => track.id === id)?.wavesurfer
   );
 
-  const containerRef = useRef<HTMLElement>(null);
+  const containerRef = useRef<any>(null);
 
   const plugins: any = [];
   plugins.push(
@@ -48,7 +51,7 @@ function AudioTrack({ id }: AudioTrackProps) {
   useEffect(() => {
     console.log('create and set wavesurfer instance', id);
     const waveSurferInstance = WaveSurfer.create({
-      url: 'src/assets/StarWars60.wav',
+      url: sampleWav,
       backend: 'WebAudio',
       container: `#waveform-${id}`,
       waveColor: '#47B784',
@@ -59,6 +62,26 @@ function AudioTrack({ id }: AudioTrackProps) {
       fillParent: true,
     });
     setTrackWaveSurfer(id, waveSurferInstance);
+
+    // set the event hooks
+    waveSurferInstance.on('play', () => {
+      sendCmdToAllRemotePeers('play', {
+        id,
+      });
+    });
+    waveSurferInstance.on('pause', () => {
+      sendCmdToAllRemotePeers('pause', {
+        id,
+      });
+    });
+    waveSurferInstance.on('seeking', (progress) => {
+      console.log('seekTo', progress);
+      sendCmdToAllRemotePeers('seekTo', {
+        id,
+        progress,
+      });
+    });
+
     return () => {
       // cleanup
     };
@@ -81,18 +104,19 @@ function AudioTrack({ id }: AudioTrackProps) {
     trackWaveSurfer?.playPause();
   }
   async function play() {
-    console.log('play', trackWaveSurfer);
     trackWaveSurfer?.play();
   }
 
   async function pause() {
-    console.log('pause');
     trackWaveSurfer?.pause();
   }
 
   async function stop() {
-    console.log('stop');
     trackWaveSurfer?.stop();
+    // stop doesn't have a wavesurfer hook, so send the cmd to remote peers here
+    sendCmdToAllRemotePeers('stop', {
+      id,
+    });
   }
 
   function handleContainerFocus() {

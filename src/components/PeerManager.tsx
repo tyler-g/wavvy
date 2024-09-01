@@ -16,7 +16,9 @@ type PeerData = {
   cmd: setFns;
   data: unknown;
 };
-type setFns = 'addTrack' | 'removeTrack' | 'sync';
+type setFns = 'addTrack' | 'removeTrack' | 'sync' | 'seekTo';
+
+const waveSurferFns = ['play', 'pause', 'playPause', 'stop', 'seekTo'];
 
 const PeerManager = () => {
   console.log('PeerManager render');
@@ -48,7 +50,7 @@ const PeerManager = () => {
       if (data instanceof Array !== true) return;
       data.forEach((history: MixerAction) => {
         const { cmd, data } = history;
-        const mixerCmdFn = useMixerStore.getState()[[cmd]];
+        const mixerCmdFn = useMixerStore.getState()[`${[cmd]}`];
         // pass true (isPeer param) so that store knows this came from a peer, and not to send cmd again, causing loop
         if (data) {
           mixerCmdFn(data, true);
@@ -59,7 +61,37 @@ const PeerManager = () => {
 
       return;
     }
-    const mixerCmdFn = useMixerStore.getState()[[cmd]];
+
+    // if it's wavesurfer cmd
+    if (waveSurferFns.includes(cmd)) {
+      const { data } = obj;
+      // get the wavesurfer instance
+      const waveSurferInstance = useMixerStore
+        .getState()
+        // eslint-disable-next-line
+        // @ts-ignore
+        .tracks.filter((track) => track.id === data?.id)[0].wavesurfer;
+
+      console.log('waveSurferInstance', waveSurferInstance);
+
+      if (!waveSurferInstance) return;
+
+      if (cmd === 'seekTo') {
+        // eslint-disable-next-line
+        // @ts-ignore
+        const { progress } = data;
+        console.log('seekTo', progress);
+        waveSurferInstance.seekTo(progress);
+        return;
+      }
+      // call the fn on this instance
+      waveSurferInstance[`${cmd}`]();
+
+      return;
+    }
+
+    // store action cmds
+    const mixerCmdFn = useMixerStore.getState()[`${cmd}`];
     // pass true (isPeer param) so that store knows this came from a peer, and not to send cmd again, causing loop
     if (data) {
       mixerCmdFn(data, true);
@@ -85,8 +117,8 @@ const PeerManager = () => {
         sendCurrentStateToAllRemotePeers();
       });
       conn.on('close', () => {
-        // TODO: figure out why this event never fires (only iceStateChanged disconnected does, after a small delay)
-        console.log('the remote peer disconnected');
+        console.log('the originator disconnected');
+        removeRemotePeer(conn);
       });
       conn.on('iceStateChanged', (state) => {
         if (state === 'disconnected') {
@@ -95,10 +127,6 @@ const PeerManager = () => {
           removeRemotePeer(conn);
         }
       });
-    });
-    me.on('disconnected', (id) => {
-      // connection originator closed the connection
-      console.log('me disconnected!', id);
     });
   }, [me]);
 
@@ -121,8 +149,9 @@ const PeerManager = () => {
       console.error('error connect', err);
     });
     conn.on('close', () => {
-      // TODO: figure out why this event never fires (only iceStateChanged disconnected does, after a small delay)
+      // this fires on refresh tab, but iceStateChanged only on close tab?
       console.log('remote peer disconnected');
+      removeRemotePeer(conn);
     });
     conn.on('iceStateChanged', (state) => {
       console.log('remote peer closed the connection', state);

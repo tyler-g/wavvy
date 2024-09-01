@@ -1,5 +1,5 @@
 import usePeerStore from '../stores/Peer';
-import useMixerStore, { MixerState, TrackState } from '../stores/Mixer';
+import useMixerStore from '../stores/Mixer';
 
 export const sendCmdToAllRemotePeers = (cmd: string, data: any) => {
   // send command to all connected remote peers
@@ -7,7 +7,6 @@ export const sendCmdToAllRemotePeers = (cmd: string, data: any) => {
   if (!remotePeers.length) return;
   console.log('sendCmdToAllRemotePeers', cmd, data, remotePeers);
   remotePeers.forEach((peer) => {
-    console.log('send removeTrack to remote peer:', peer);
     peer.connection.send({
       cmd,
       data,

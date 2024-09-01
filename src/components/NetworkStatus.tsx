@@ -4,7 +4,6 @@ import { Drawer, List, rem } from '@mantine/core';
 import { useHover } from '@mantine/hooks';
 import { useDisclosure } from '@mantine/hooks';
 import { IconAffiliate } from '@tabler/icons-react';
-
 import { useShallow } from 'zustand/react/shallow';
 import usePeerStore from '../stores/Peer';
 
@@ -14,7 +13,7 @@ const NetworkStatus = () => {
   console.log('NetworkStatus render');
   const [color, setColor] = useState('white');
   const [opened, { open, close }] = useDisclosure(false);
-  const { hovered, ref } = useHover();
+  const { hovered, ref } = useHover<any>();
 
   const myPeerId = usePeerStore((state) => state.me?.peer?.id);
   const remotePeers = usePeerStore(useShallow((state) => state.remote));

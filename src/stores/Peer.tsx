@@ -14,7 +14,7 @@ interface PeerState {
   remote: RemoteState[];
   setMePeer: (peer: Peer) => void;
   addRemotePeer: (connection: DataConnection) => void;
-  removeRemotePeer: (connection: DataConnection) => void;
+  removeRemotePeer: (connection: DataConnection | string) => void;
 }
 
 const usePeerStore = create<PeerState>((set) => ({
@@ -36,9 +36,12 @@ const usePeerStore = create<PeerState>((set) => ({
   },
   removeRemotePeer: (connection) => {
     set((state) => ({
-      remote: [...state.remote].filter(
-        (peer) => peer.connection.peer !== connection.peer
-      ),
+      remote: [...state.remote].filter((peer) => {
+        if (typeof connection === 'string') {
+          return peer.connection.peer !== connection;
+        }
+        return peer.connection.peer !== connection.peer;
+      }),
     }));
     console.log('removeRemotePeer', connection);
   },
