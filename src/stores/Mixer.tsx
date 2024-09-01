@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type WaveSurferType from 'wavesurfer.js';
 import WaveSurfer from 'wavesurfer.js';
 import { sendCmdToAllRemotePeers } from '../utils/peer-utils';
 
@@ -10,7 +9,7 @@ interface MasterState {
   analyserNode: AnalyserNode | null;
 }
 
-interface TrackState {
+export interface TrackState {
   id: number;
   wavesurfer: WaveSurfer | null;
   source: MediaStream | null;
@@ -20,13 +19,15 @@ interface removeTrackMetadata {
   id: number;
 }
 
-interface MixerState {
+export interface MixerState {
+  history: MixerAction[];
   master: MasterState;
+  addActionToHistory: (action: MixerAction) => void;
   setupMasterAudioContext: () => void;
   setMasterVolumeWorkletNode: (node: AudioWorkletNode) => void;
   tracks: TrackState[];
   setDb: (val: number) => void;
-  setTrackWaveSurfer: (id: number, instance: WaveSurferType) => void;
+  setTrackWaveSurfer: (id: number, instance: WaveSurfer) => void;
   setTrackSource: (id: number, stream: MediaStream) => void;
 
   // these are actions that can be used locally or from a peer cmd
@@ -34,7 +35,13 @@ interface MixerState {
   removeTrack: (data: removeTrackMetadata, fromPeer?: boolean) => void;
 }
 
+export interface MixerAction {
+  cmd: string;
+  data?: unknown;
+}
+
 const useMixerStore = create<MixerState>((set) => ({
+  history: [],
   master: {
     db: 0,
     audioContext: null,
@@ -42,6 +49,11 @@ const useMixerStore = create<MixerState>((set) => ({
     analyserNode: null,
   },
   tracks: [] as TrackState[],
+  addActionToHistory: (action) => {
+    set((state) => ({
+      history: [...state.history, action],
+    }));
+  },
   setMasterVolumeWorkletNode: (node) => {
     set((state) => ({
       master: { ...state.master, volumeWorkletNode: node },
@@ -53,7 +65,6 @@ const useMixerStore = create<MixerState>((set) => ({
 
     // set up master audio context and analyser
     const context = new AudioContext();
-    //context.create
     const analyser = context.createAnalyser();
     analyser.fftSize = 4096;
     analyser.connect(context.destination);
@@ -123,6 +134,11 @@ const useMixerStore = create<MixerState>((set) => ({
     set((state) => ({
       tracks: [...state.tracks, { id, wavesurfer: null, source: null }],
     }));
+
+    const { addActionToHistory } = useMixerStore.getState();
+    addActionToHistory({
+      cmd: 'addTrack',
+    });
     if (!fromPeer) {
       sendCmdToAllRemotePeers('addTrack', null);
     }

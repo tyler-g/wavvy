@@ -1,11 +1,11 @@
 import { useShallow } from 'zustand/react/shallow';
-
 import useMixerStore from '../stores/Mixer';
 
 import meterImage from '../assets/vu.jpg';
 import './MasterMeter.css';
 
 function MasterMeter() {
+  console.log('MasterMeter render');
   //re-renders the component only when db changes
   const [db] = useMixerStore(useShallow((state) => [state.master.db]));
 

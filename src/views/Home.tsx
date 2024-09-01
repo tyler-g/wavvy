@@ -5,10 +5,11 @@ import AudioTrackManager from '../components/AudioTrackManager';
 import PeerManager from '../components/PeerManager';
 import NetworkStatus from '../components/NetworkStatus';
 
-import useMixerStore from '../stores/Mixer';
 import { useShallow } from 'zustand/react/shallow';
+import useMixerStore from '../stores/Mixer';
 
 const Home = () => {
+  console.log('Home view render');
   const [tracks] = useMixerStore(useShallow((state) => [state.tracks]));
 
   return (

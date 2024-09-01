@@ -1,6 +1,7 @@
 import useMixerStore from '../stores/Mixer';
 
 const AudioTrackManager = () => {
+  console.log('AudioTrackManager render');
   const addTrack = useMixerStore((state) => state.addTrack);
 
   function daddTrack() {

@@ -1,20 +1,25 @@
+import { useRef, useEffect } from 'react';
+
 import { useDisclosure } from '@mantine/hooks';
 import { Modal, Button, Input, Center } from '@mantine/core';
+
 import { Peer } from 'peerjs';
-import { useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import usePeerStore from '../stores/Peer';
-import useMixerStore from '../stores/Mixer';
+
 import { useShallow } from 'zustand/react/shallow';
+import usePeerStore from '../stores/Peer';
+import useMixerStore, { MixerAction } from '../stores/Mixer';
+
+import { sendCurrentStateToAllRemotePeers } from '../utils/peer-utils';
 
 type PeerData = {
   cmd: setFns;
   data: unknown;
 };
-type setFns = 'addTrack' | 'removeTrack';
+type setFns = 'addTrack' | 'removeTrack' | 'sync';
 
 const PeerManager = () => {
-  console.log('PeerManager reder');
+  console.log('PeerManager render');
   const [opened, { open, close }] = useDisclosure(false);
   const remoteId = useRef('');
 
@@ -30,8 +35,26 @@ const PeerManager = () => {
 
   function handleIncomingData(obj: PeerData) {
     const { cmd, data } = obj;
-    const mixerCmdFn = useMixerStore.getState()[[cmd]];
 
+    console.log('handleIncomingData', obj);
+    // sync is a special case
+    if (cmd === 'sync') {
+      console.log('got a sync cmd!', data);
+      if (data instanceof Array !== true) return;
+      data.forEach((history: MixerAction) => {
+        const { cmd, data } = history;
+        const mixerCmdFn = useMixerStore.getState()[[cmd]];
+        // pass true (isPeer param) so that store knows this came from a peer, and not to send cmd again, causing loop
+        if (data) {
+          mixerCmdFn(data, true);
+        } else {
+          mixerCmdFn(true);
+        }
+      });
+
+      return;
+    }
+    const mixerCmdFn = useMixerStore.getState()[[cmd]];
     // pass true (isPeer param) so that store knows this came from a peer, and not to send cmd again, causing loop
     if (data) {
       mixerCmdFn(data, true);
@@ -44,6 +67,7 @@ const PeerManager = () => {
     if (!me) return;
     console.log('me updated!', me);
     me.on('connection', (conn) => {
+      console.log('someone connected to me');
       conn.on('data', (obj) => {
         console.log('receiver getting data from sender', me.id, conn.peer);
         handleIncomingData(obj as PeerData);
@@ -52,6 +76,8 @@ const PeerManager = () => {
         // receiving side
         console.log('on open, receiver', conn);
         addRemotePeer(conn);
+        // someone connected to me. sync my state to them
+        sendCurrentStateToAllRemotePeers();
       });
     });
     me.on('disconnected', (id) => {

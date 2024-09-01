@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
+
 import useMixerStore from '../stores/Mixer';
+
 import './MasterTrack.css';
 
 function MasterTrack() {
+  console.log('MasterTrack render');
   const setupMasterAudioContext = useMixerStore(
     (state) => state.setupMasterAudioContext
   );
@@ -19,7 +22,7 @@ function MasterTrack() {
   return (
     <>
       <div className="master-track-container">
-        <div className="master-track-controls">MASTER TRACK</div>
+        <div className="master-track-controls"></div>
       </div>
     </>
   );

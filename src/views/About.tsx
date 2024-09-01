@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 const About = () => {
+  console.log('About view render');
   useEffect(() => {
     console.log('about');
     window.scrollTo({

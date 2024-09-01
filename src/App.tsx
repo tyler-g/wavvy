@@ -7,6 +7,7 @@ import About from './views/About';
 import './App.css';
 
 const App = () => {
+  console.log('App render');
   return (
     <MantineProvider defaultColorScheme="dark">
       <NetworkStatus></NetworkStatus>

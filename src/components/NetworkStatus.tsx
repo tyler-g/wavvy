@@ -1,11 +1,14 @@
-import './NetworkStatus.css';
 import { useState, useEffect } from 'react';
+
 import { Drawer, List, rem } from '@mantine/core';
 import { useHover } from '@mantine/hooks';
 import { useDisclosure } from '@mantine/hooks';
 import { IconAffiliate } from '@tabler/icons-react';
-import usePeerStore from '../stores/Peer';
+
 import { useShallow } from 'zustand/react/shallow';
+import usePeerStore from '../stores/Peer';
+
+import './NetworkStatus.css';
 
 const NetworkStatus = () => {
   console.log('NetworkStatus render');
