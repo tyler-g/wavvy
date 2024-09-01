@@ -23,8 +23,13 @@ const PeerManager = () => {
   const [opened, { open, close }] = useDisclosure(false);
   const remoteId = useRef('');
 
-  const [me, setupMe, addRemotePeer] = usePeerStore(
-    useShallow((state) => [state.me.peer, state.setMePeer, state.addRemotePeer])
+  const [me, setupMe, addRemotePeer, removeRemotePeer] = usePeerStore(
+    useShallow((state) => [
+      state.me.peer,
+      state.setMePeer,
+      state.addRemotePeer,
+      state.removeRemotePeer,
+    ])
   );
 
   useEffect(() => {
@@ -79,8 +84,20 @@ const PeerManager = () => {
         // someone connected to me. sync my state to them
         sendCurrentStateToAllRemotePeers();
       });
+      conn.on('close', () => {
+        // TODO: figure out why this event never fires (only iceStateChanged disconnected does, after a small delay)
+        console.log('the remote peer disconnected');
+      });
+      conn.on('iceStateChanged', (state) => {
+        if (state === 'disconnected') {
+          console.log('originator closed the connection');
+          // remote peer disconnected
+          removeRemotePeer(conn);
+        }
+      });
     });
     me.on('disconnected', (id) => {
+      // connection originator closed the connection
       console.log('me disconnected!', id);
     });
   }, [me]);
@@ -102,6 +119,18 @@ const PeerManager = () => {
     });
     conn.on('error', (err) => {
       console.error('error connect', err);
+    });
+    conn.on('close', () => {
+      // TODO: figure out why this event never fires (only iceStateChanged disconnected does, after a small delay)
+      console.log('remote peer disconnected');
+    });
+    conn.on('iceStateChanged', (state) => {
+      console.log('remote peer closed the connection', state);
+      if (state === 'disconnected') {
+        console.log('remote peer closed the connection');
+        // remote peer disconnected
+        removeRemotePeer(conn);
+      }
     });
   }
   return (
