@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react';
 import useMixerStore from '../stores/Mixer';
+import { useShallow } from "zustand/react/shallow"
 import './MasterTrack.css';
 
 function MasterTrack() {
-  const setMasterAudioContext = useMixerStore(state => state.setMasterAudioContext)
+  const setupMasterAudioContext = useMixerStore(state => state.setupMasterAudioContext)
+  //const  [setMasterAudioContext, setMasterAnalyserNode] = useMixerStore(useShallow(state => [state.setMasterAudioContext, state.setMasterAnalyserNode]))
 
   // set the audio context
   useEffect(()=> {
-
     // chrome requires user interaction before audioContext will work, so do small delay 
     setTimeout(() => {
-      const audioContext = new AudioContext();
-      console.log('setting master context', audioContext)
-      setMasterAudioContext(audioContext)
-    }, 1000)
+      setupMasterAudioContext();
+    }, 1200)
 
   }, []);
 

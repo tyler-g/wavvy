@@ -4,7 +4,7 @@ import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js"
 //import RecordPlugin from "wavesurfer.js/dist/plugins/record.esm.js"
 
 import useMixerStore from "../stores/Mixer"
-import { useShallow, } from "zustand/react/shallow"
+import { useShallow } from "zustand/react/shallow"
 
 import "./AudioTrack.css"
 
@@ -16,7 +16,7 @@ function AudioTrack({ id }: AudioTrackProps) {
   console.log("AudioTrack render", id)
   const setTrackWaveSurfer = useMixerStore(state => state.setTrackWaveSurfer)
   const setTrackSource = useMixerStore(state => state.setTrackSource)
-  const setDb = useMixerStore(state => state.setDb)
+
   const removeTrack = useMixerStore(state => state.removeTrack)
   const  [masterAudioContext] = useMixerStore(useShallow(state => [state.master.audioContext]))
 
@@ -52,6 +52,7 @@ function AudioTrack({ id }: AudioTrackProps) {
     console.log("create and set wavesurfer instance", id)
     const waveSurferInstance = WaveSurfer.create({
       url: "src/assets/StarWars60.wav",
+      backend: 'WebAudio',
       container: `#waveform-${id}`,
       waveColor: "#47B784",
       //progressColor: "#EB9D9C",
@@ -60,43 +61,11 @@ function AudioTrack({ id }: AudioTrackProps) {
       interact: true,
       fillParent: true,
     })
-
     setTrackWaveSurfer(id, waveSurferInstance)
     return () => {
       // cleanup
-      removeTrack(id)
-      console.log("tracks after removeTrack")
     }
   }, [])
-
-  // useEffect(() => {
-  //   console.log('master audio context has been set'); return;
-  //   if (!audioStream) return
-  //   const audioContext = new AudioContext()
-  //    const streamSource = audioContext.createMediaStreamSource(audioStream)
-  //   // Loads module script via AudioWorklet.
-  //   audioContext.audioWorklet
-  //     .addModule("src/worklets/volume-meter-processor.js")
-  //     .then(async () => {
-  //       console.log("added module volume meter processor"!)
-  //       const volumeMeterNode = new AudioWorkletNode(
-  //         audioContext,
-  //         "volume-meter",
-  //       )
-  //       volumeMeterNode.port.onmessage = ({ data }) => {
-  //         setDb(data)
-  //       }
-  //       // connect chain
-  //       streamSource.connect(volumeMeterNode).connect(audioContext.destination)
-  //     })
-  //     .catch(err => {
-  //       console.log("could not add module my prcessor", err)
-  //     })
-
-  //   return () => {
-  //     // cleanup
-  //   }
-  // }, [test])
 
   async function record() {
     try {
@@ -153,6 +122,9 @@ function AudioTrack({ id }: AudioTrackProps) {
           </button>
           <button onClick={stop} tabIndex={-1}>
             stop
+          </button>
+          <button onClick={() => removeTrack({id})} tabIndex={-1}>
+            remove
           </button>
         </div>
         <div className="audio-track">

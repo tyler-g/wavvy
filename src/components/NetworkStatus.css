@@ -1,0 +1,6 @@
+.network-status {
+	position: fixed;
+	margin-top: 10px;
+	margin-left: 10px;
+	cursor: pointer;
+}

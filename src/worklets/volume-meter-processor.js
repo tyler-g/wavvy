@@ -24,6 +24,7 @@ class VolumeMeter extends AudioWorkletProcessor {
   }
 
   calculateRMS(inputChannelData) {
+    if (!inputChannelData) return;
     // Calculate the squared-sum.
     let sum = 0;
     for (let i = 0; i < inputChannelData.length; i++) {
@@ -38,7 +39,7 @@ class VolumeMeter extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
-    console.log(inputs, outputs);
+    if (!inputs) return;
     // This example only handles mono channel.
     const inputChannelData = inputs[0][0];
 

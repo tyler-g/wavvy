@@ -1,11 +1,16 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom"
+import { MantineProvider } from '@mantine/core';
+import NetworkStatus from "./components/NetworkStatus";
 import Home from "./views/Home"
 import About from "./views/About"
 
 import "./App.css"
 
+
 const App = () => {
   return (
+    <MantineProvider defaultColorScheme="dark">
+          <NetworkStatus></NetworkStatus>
     <BrowserRouter>
       <div className="App">
         <header className="App-header">
@@ -25,6 +30,7 @@ const App = () => {
         </Routes>
       </div>
     </BrowserRouter>
+    </MantineProvider>
   )
 }
 

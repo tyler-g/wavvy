@@ -8,7 +8,7 @@ import "./MasterMeter.css"
 
 function MasterMeter() {
   //re-renders the component only when db changes
-  const [db] = useMixerStore(useShallow(state => [state.db]))
+  const [db] = useMixerStore(useShallow(state => [state.master.db]))
 
   // computed
   const dbRounded = Math.round(db)

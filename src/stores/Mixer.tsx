@@ -1,11 +1,14 @@
 import { create } from "zustand"
 import type WaveSurferType from "wavesurfer.js"
 import WaveSurfer from "wavesurfer.js"
+import usePeerStore from "./Peer"
+import { sendCmdToAllRemotePeers} from '../utils/peer-utils';
 
 interface MasterState {
   db: number
   audioContext: AudioContext | null
   volumeWorkletNode: AudioWorkletNode | null
+  analyserNode: AnalyserNode | null
 }
 
 interface TrackState {
@@ -14,16 +17,26 @@ interface TrackState {
   source: MediaStream | null
 }
 
+interface SetterFnHash {
+  [key: string]: Function;
+}
+
+interface removeTrackMetadata {
+  id: number;
+}
+
 interface MixerState {
   master: MasterState
-  setMasterAudioContext: (context: AudioContext) => void
+  setupMasterAudioContext: () => void
   setMasterVolumeWorkletNode: (node: AudioWorkletNode) => void
   tracks: TrackState[]
   setDb: (val: number) => void
   setTrackWaveSurfer: (id: number, instance: WaveSurferType) => void
   setTrackSource: (id: number, stream: MediaStream) => void
-  addTrack: () => void
-  removeTrack: (id: number) => void
+
+  // these are actions that can be used locally or from a peer cmd
+  addTrack: (fromPeer?: boolean) => void
+  removeTrack: (data: removeTrackMetadata, fromPeer?: boolean) => void
 }
 
 const useMixerStore = create<MixerState>(set => ({
@@ -31,6 +44,7 @@ const useMixerStore = create<MixerState>(set => ({
     db: 0,
     audioContext: null,
     volumeWorkletNode: null,
+    analyserNode: null,
   },
   tracks: [] as TrackState[],
   setMasterVolumeWorkletNode: (node) => {
@@ -39,31 +53,31 @@ const useMixerStore = create<MixerState>(set => ({
     }))
     console.log('setMasterVolumeWorkletNode', node);
   },
-  setMasterAudioContext: (context) => {
-    const { setDb, setMasterVolumeWorkletNode} = useMixerStore.getState();
+  setupMasterAudioContext: async () => {
+    const { setDb, setMasterVolumeWorkletNode } = useMixerStore.getState();
+
+    // set up master audio context and analyser
+    const context = new AudioContext();
+    //context.create
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 4096;
+    analyser.connect(context.destination);
+
     set((state) => ({
-      master: {...state.master, audioContext: context},
+      master: {...state.master, audioContext: context, analyserNode: analyser},
     }))
     context.audioWorklet
       .addModule("src/worklets/volume-meter-processor.js")
       .then(async () => {
-        console.log("added module volume meter processor"!)
         const volumeMeterNode = new AudioWorkletNode(
           context,
           "volume-meter",
         )
         volumeMeterNode.port.onmessage = ({ data }) => {
-          console.log('on volume', data)
-          //setDb(data);
+          setDb(data);
         }
-        //setMasterVolumeWorkletNode(volumeMeterNode);
-        // connect chain
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: false,
-        })
-        const streamSource = context.createMediaStreamSource(stream)
-        streamSource.connect(volumeMeterNode).connect(context.destination)
+        setMasterVolumeWorkletNode(volumeMeterNode);
+        volumeMeterNode.connect(analyser)
       })
       .catch(err => {
         console.error("could not add volume meter processor", err)
@@ -83,36 +97,43 @@ const useMixerStore = create<MixerState>(set => ({
     }))
   },
   setTrackSource: (id, stream) => {
-    
+    console.log('setTrackSource', id , stream);
     const masterState = useMixerStore.getState().master;
-    console.log('hey', masterState.audioContext, masterState.volumeWorkletNode) 
+
     const tracks = useMixerStore.getState().tracks
     const trackIndexWithThisId = tracks.findIndex(track => track.id === id)
     const newTracks = [...tracks]
     newTracks[trackIndexWithThisId].source = stream
 
     const streamSource = masterState.audioContext?.createMediaStreamSource(stream);
-    console.log('streamSource', streamSource);
     if (masterState.volumeWorkletNode && masterState.audioContext?.destination) {
-      const ok = streamSource?.connect(masterState.volumeWorkletNode).connect(masterState.audioContext.destination)
-      console.log('connect the dots', ok);
+      streamSource?.connect(masterState.volumeWorkletNode);
     };
     
     set(state => ({
       tracks: [...newTracks],
     }))
   },
-  addTrack: () => {
+  addTrack: (fromPeer = false) => {
     const tracks = useMixerStore.getState().tracks
     const id = tracks.length + 1
     set(state => ({
       tracks: [...state.tracks, { id, wavesurfer: null, source: null}],
     }))
+    if (!fromPeer) {
+      sendCmdToAllRemotePeers('addTrack', null);
+    }
+    
   },
-  removeTrack: id => {
+  removeTrack: (data, fromPeer = false) => {
+    const { id } = data;
+    console.log('removeTrack', id, fromPeer);
     set(state => ({
       tracks: [...state.tracks].filter(track => track.id !== id),
     }))
+    if (!fromPeer) {
+      sendCmdToAllRemotePeers('removeTrack', data);
+    }
   },
 }))
 
