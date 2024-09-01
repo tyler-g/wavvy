@@ -23,7 +23,6 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.26.1",
-    "superjson": "^2.2.1",
     "uuid": "^10.0.0",
     "wavesurfer.js": "^7.8.4",
     "zustand": "^4.5.5"
