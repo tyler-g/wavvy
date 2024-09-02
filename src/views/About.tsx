@@ -12,7 +12,7 @@ const About = () => {
   }, []);
 
   return (
-    <div className="container mx-auto sm">
+    <div className="sm container mx-auto">
       <h1>About</h1>
       <p>
         waVVy started as a personal project when it became clear that WebAudio

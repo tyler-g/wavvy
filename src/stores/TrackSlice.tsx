@@ -1,8 +1,10 @@
 import { StateCreator } from 'zustand';
 import WaveSurfer, { WaveSurferEvents } from 'wavesurfer.js';
-import { sendCmdToAllRemotePeers } from '../utils/peer-utils';
+
 import { MasterSlice } from './MasterSlice';
 import { HistorySlice } from './HistorySlice';
+
+import { sendCmdToAllRemotePeers } from '../utils/peer-utils';
 
 interface removeTrackMetadata {
   id: number;
@@ -51,7 +53,6 @@ export const createTrackSlice: StateCreator<
     }));
   },
   setTrackWaveSurferEventListener: (id, event, listener) => {
-    console.log('setTrackWaveSurferEventListener', id, event, listener);
     const tracks = get().tracks;
     const trackIndexWithThisId = tracks.findIndex((track) => track.id === id);
     const newTracks = [...tracks];
