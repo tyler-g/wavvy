@@ -8,9 +8,15 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { useShallow } from 'zustand/react/shallow';
 import usePeerStore from '../stores/Peer';
-import useMixerStore, { MixerAction } from '../stores/Mixer';
+import useMixerStore from '../stores/Mixer';
+import { MixerAction } from '../stores/HistorySlice';
 
-import { sendCurrentStateToAllRemotePeers } from '../utils/peer-utils';
+import {
+  sendCurrentStateToAllRemotePeers,
+  sendCmdToAllRemotePeers,
+} from '../utils/peer-utils';
+
+import { WaveSurferEvents } from 'wavesurfer.js';
 
 type PeerData = {
   cmd: setFns;
@@ -40,7 +46,7 @@ const PeerManager = () => {
     console.log('me', me);
   }, []);
 
-  function handleIncomingData(obj: PeerData) {
+  async function handleIncomingData(obj: PeerData) {
     const { cmd, data } = obj;
 
     console.log('handleIncomingData', obj);
@@ -72,20 +78,41 @@ const PeerManager = () => {
         // @ts-ignore
         .tracks.filter((track) => track.id === data?.id)[0].wavesurfer;
 
-      console.log('waveSurferInstance', waveSurferInstance);
-
-      if (!waveSurferInstance) return;
-
       if (cmd === 'seekTo') {
+        const waveSurferSeekListenerFn = useMixerStore
+          .getState()
+          // eslint-disable-next-line
+          // @ts-ignore
+          .tracks.filter((track) => track.id === data?.id)[0]
+          .wavesurferEventListeners['seeking'];
         // eslint-disable-next-line
         // @ts-ignore
         const { progress } = data;
         console.log('seekTo', progress);
-        waveSurferInstance.seekTo(progress);
+        waveSurferInstance.un('seeking', waveSurferSeekListenerFn);
+        // seekTo does not return a promise, so no await here
+        // progress from the seeking event is given as the time in seconds,
+        // but seekTo wants a percentage (between 0 and 1) *sigh*
+        const seekToPosition = progress / waveSurferInstance.getDuration();
+        waveSurferInstance.seekTo(seekToPosition);
+        waveSurferInstance.on('seeking', waveSurferSeekListenerFn);
         return;
       }
-      // call the fn on this instance
-      waveSurferInstance[`${cmd}`]();
+      const waveSurferListenerFn = useMixerStore
+        .getState()
+        // eslint-disable-next-line
+        // @ts-ignore
+        .tracks.filter((track) => track.id === data?.id)[0]
+        .wavesurferEventListeners[cmd];
+
+      if (!waveSurferInstance) return;
+
+      const eventName = `${cmd}` as keyof WaveSurferEvents;
+      // unbind event listener so it doesn't trigger sending back to peers
+      waveSurferInstance.un(eventName, waveSurferListenerFn);
+      await waveSurferInstance[`${cmd}`]();
+      // rebind after the promise has resolved and we know the event hook has already occurred
+      waveSurferInstance.on(eventName, waveSurferListenerFn);
 
       return;
     }

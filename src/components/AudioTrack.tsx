@@ -18,6 +18,9 @@ function AudioTrack({ id }: AudioTrackProps) {
   console.log('AudioTrack render', id);
   const setTrackWaveSurfer = useMixerStore((state) => state.setTrackWaveSurfer);
   const setTrackSource = useMixerStore((state) => state.setTrackSource);
+  const setTrackWaveSurferEventListener = useMixerStore(
+    (state) => state.setTrackWaveSurferEventListener
+  );
   const removeTrack = useMixerStore((state) => state.removeTrack);
 
   const trackWaveSurfer = useMixerStore(
@@ -63,27 +66,36 @@ function AudioTrack({ id }: AudioTrackProps) {
     });
     setTrackWaveSurfer(id, waveSurferInstance);
 
-    // set the event hooks
-    waveSurferInstance.on('play', () => {
+    // the listenenr fns must be passed to the store with the exact ref to the fn
+    // so that the .un and .on wavesurfer methods can be used properly
+    const usePlay = () => {
       sendCmdToAllRemotePeers('play', {
         id,
       });
-    });
-    waveSurferInstance.on('pause', () => {
+    };
+    const usePause = () => {
       sendCmdToAllRemotePeers('pause', {
         id,
       });
-    });
-    waveSurferInstance.on('seeking', (progress) => {
-      console.log('seekTo', progress);
+    };
+    const useSeek = (progress) => {
       sendCmdToAllRemotePeers('seekTo', {
         id,
         progress,
       });
-    });
+    };
+    setTrackWaveSurferEventListener(id, 'play', usePlay);
+    setTrackWaveSurferEventListener(id, 'pause', usePause);
+    setTrackWaveSurferEventListener(id, 'seeking', useSeek);
+
+    // set the event hooks
+    waveSurferInstance.on('play', usePlay);
+    waveSurferInstance.on('pause', usePause);
+    waveSurferInstance.on('seeking', useSeek);
 
     return () => {
       // cleanup
+      waveSurferInstance.unAll();
     };
   }, []);
 
