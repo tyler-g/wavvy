@@ -27,7 +27,7 @@ function AudioTrack({ id }: AudioTrackProps) {
     (state) => state.tracks.find((track) => track.id === id)?.wavesurfer
   );
 
-  const containerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const plugins: any = [];
   plugins.push(
