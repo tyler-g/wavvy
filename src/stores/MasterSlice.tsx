@@ -47,6 +47,7 @@ export const createMasterSlice: StateCreator<
       .then(async () => {
         const volumeMeterNode = new AudioWorkletNode(context, 'volume-meter');
         volumeMeterNode.port.onmessage = ({ data }) => {
+          console.log('volume msg', data);
           setDb(data);
         };
         setMasterVolumeWorkletNode(volumeMeterNode);

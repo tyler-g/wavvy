@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js';
-//import RecordPlugin from "wavesurfer.js/dist/plugins/record.esm.js"
+import RecordPlugin from 'wavesurfer.js/dist/plugins/record.esm.js';
 
+import { useShallow } from 'zustand/react/shallow';
 import useMixerStore from '../stores/Mixer';
 
 import { sendCmdToAllRemotePeers } from '../utils/peer-utils';
@@ -16,44 +17,50 @@ type AudioTrackProps = {
 
 function AudioTrack({ id }: AudioTrackProps) {
   console.log('AudioTrack render', id);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
   const setTrackWaveSurfer = useMixerStore((state) => state.setTrackWaveSurfer);
-  const setTrackSource = useMixerStore((state) => state.setTrackSource);
   const setTrackWaveSurferEventListener = useMixerStore(
     (state) => state.setTrackWaveSurferEventListener
   );
   const removeTrack = useMixerStore((state) => state.removeTrack);
+  const [volumeWorkletNode, audioContext] = useMixerStore(
+    useShallow((state) => [
+      state.master.volumeWorkletNode,
+      state.master.audioContext,
+    ])
+  );
 
   const trackWaveSurfer = useMixerStore(
     (state) => state.tracks.find((track) => track.id === id)?.wavesurfer
   );
 
+  const recordPluginInstance = useRef<RecordPlugin>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const plugins: any = [];
-  plugins.push(
-    TimelinePlugin.create({
-      container: `#waveform-timeline-${id}`,
-    })
-  );
-
-  // bind keypress listener not to window but to the container of this specific track
   useEffect(() => {
-    const refForCleanup = containerRef.current;
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.code === 'Space') {
-        event.preventDefault();
-        playPause();
-      }
-    };
-    containerRef.current?.addEventListener('keydown', handleKeyPress);
+    if (!trackWaveSurfer) return;
+    const recordPlugin = trackWaveSurfer.registerPlugin(
+      RecordPlugin.create({
+        scrollingWaveform: true,
+        renderRecordedAudio: true,
+        scrollingWaveformWindow: 60,
+        audioContext,
+      })
+    );
+    recordPlugin?.on('record-data-available', (blob) => {
+      console.log('data', blob);
+    });
+    recordPluginInstance.current = recordPlugin;
     return () => {
-      refForCleanup?.removeEventListener('keydown', handleKeyPress);
+      // cleanup listeners
+      //recordPluginInstance.current.unAll();
     };
-  }, [play]);
+  }, [trackWaveSurfer]);
 
   useEffect(() => {
     console.log('create and set wavesurfer instance', id);
     const waveSurferInstance = WaveSurfer.create({
+      audioContext,
       url: sampleWav,
       backend: 'WebAudio',
       container: `#waveform-${id}`,
@@ -99,17 +106,44 @@ function AudioTrack({ id }: AudioTrackProps) {
     };
   }, []);
 
-  async function record() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-      });
+  // bind keypress listener not to window but to the container of this specific track
+  useEffect(() => {
+    const refForCleanup = containerRef.current;
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        playPause();
+      }
+    };
+    containerRef.current?.addEventListener('keydown', handleKeyPress);
+    return () => {
+      refForCleanup?.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [play]);
 
-      setTrackSource(id, stream);
-    } catch (err) {
-      console.error('could not get audio stream!', err);
+  async function record() {
+    if (recordPluginInstance.current.isRecording()) {
+      recordPluginInstance.current.stopRecording();
+      recordPluginInstance.current.getSource().disconnect(volumeWorkletNode);
+      setIsRecording(false);
+      return;
     }
+    const mediaSourceNode = recordPluginInstance.current?.getSource();
+    if (mediaSourceNode) {
+      recordPluginInstance.current.resumeRecording();
+      setIsRecording(true);
+      return;
+    }
+
+    // if rec has never been started on this track yet, start it to get a source node
+    const deviceId =
+      '9829f13f81c5d636ad4b8654b65656a448843234890f44659a71f67e98babd55';
+    await recordPluginInstance.current.startRecording({
+      deviceId,
+    });
+    recordPluginInstance.current?.getSource().connect(volumeWorkletNode);
+    console.log('started recording!');
+    setIsRecording(true);
   }
 
   async function playPause() {
@@ -146,7 +180,7 @@ function AudioTrack({ id }: AudioTrackProps) {
         <span>{id} </span>
         <div className="audio-track-controls">
           <button onClick={record} tabIndex={-1}>
-            rec
+            {isRecording ? 'stop rec' : 'rec'}
           </button>
           <button onClick={play} tabIndex={-1}>
             play
