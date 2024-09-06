@@ -23,9 +23,10 @@ function AudioTrack({ id }: AudioTrackProps) {
     (state) => state.setTrackWaveSurferEventListener
   );
   const removeTrack = useMixerStore((state) => state.removeTrack);
-  const [volumeWorkletNode, audioContext] = useMixerStore(
+  const [volumeWorkletNode, pcmProcessorNode, audioContext] = useMixerStore(
     useShallow((state) => [
       state.master.volumeWorkletNode,
+      state.master.pcmProcessorNode,
       state.master.audioContext,
     ])
   );
@@ -51,6 +52,7 @@ function AudioTrack({ id }: AudioTrackProps) {
       console.log('data', blob);
     });
     recordPluginInstance.current = recordPlugin;
+    console.log('recordPlugin', recordPlugin);
     return () => {
       // cleanup listeners
       //recordPluginInstance.current.unAll();
@@ -122,18 +124,19 @@ function AudioTrack({ id }: AudioTrackProps) {
   }, [play]);
 
   async function record() {
+    console.log('click record', recordPluginInstance.current.isRecording());
     if (recordPluginInstance.current.isRecording()) {
       recordPluginInstance.current.stopRecording();
-      recordPluginInstance.current.getSource().disconnect(volumeWorkletNode);
+
+      const sourceNode = recordPluginInstance.current?.getSource();
+      // disconnect any worklets so that they can pause processing when not needed
+      sourceNode.disconnect(volumeWorkletNode);
+      sourceNode.disconnect(pcmProcessorNode);
       setIsRecording(false);
+
       return;
     }
-    const mediaSourceNode = recordPluginInstance.current?.getSource();
-    if (mediaSourceNode) {
-      recordPluginInstance.current.resumeRecording();
-      setIsRecording(true);
-      return;
-    }
+    console.log('about to record');
 
     // if rec has never been started on this track yet, start it to get a source node
     const deviceId =
@@ -141,7 +144,13 @@ function AudioTrack({ id }: AudioTrackProps) {
     await recordPluginInstance.current.startRecording({
       deviceId,
     });
-    recordPluginInstance.current?.getSource().connect(volumeWorkletNode);
+    console.log('recordPluginInstance.current', recordPluginInstance.current);
+    const sourceNode = recordPluginInstance.current?.getSource();
+
+    // connect worklets
+    sourceNode.connect(volumeWorkletNode);
+    sourceNode.connect(pcmProcessorNode);
+
     console.log('started recording!');
     setIsRecording(true);
   }

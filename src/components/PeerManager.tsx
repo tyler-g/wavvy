@@ -19,10 +19,10 @@ import {
 import { WaveSurferEvents } from 'wavesurfer.js';
 
 type PeerData = {
-  cmd: setFns;
-  data: unknown;
+  cmd: string; //TODO: type out all possible cmds
+  data: any;
 };
-type setFns = 'addTrack' | 'removeTrack' | 'sync' | 'seekTo';
+//type setFns = 'addTrack' | 'removeTrack' | 'sync' | 'seekTo';
 
 const waveSurferFns = ['play', 'pause', 'playPause', 'stop', 'seekTo'];
 
@@ -40,6 +40,15 @@ const PeerManager = () => {
     ])
   );
 
+  const decoderWorker = useRef(useMixerStore.getState().workers.decoder);
+  useEffect(
+    () =>
+      useMixerStore.subscribe(
+        (state) => (decoderWorker.current = state.workers.decoder)
+      ),
+    []
+  );
+
   useEffect(() => {
     const peer = new Peer(uuidv4());
     setupMe(peer);
@@ -50,6 +59,16 @@ const PeerManager = () => {
     const { cmd, data } = obj;
 
     console.log('handleIncomingData', obj);
+
+    if (cmd === 'flac-chunk') {
+      console.log('decode this flac-chunk from your peer!', data);
+      decoderWorker.current.postMessage({
+        cmd: 'decode',
+        buf: data.buf,
+      });
+
+      return;
+    }
     // sync is a special case
     if (cmd === 'sync') {
       console.log('got a sync cmd!', data);
