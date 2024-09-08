@@ -69,6 +69,15 @@ const PeerManager = () => {
 
       return;
     }
+
+    if (cmd === 'rec-end') {
+      console.log('rec-end from your peer!');
+      decoderWorker.current.postMessage({
+        cmd: 'rec-end',
+      });
+      return;
+    }
+
     // sync is a special case
     if (cmd === 'sync') {
       console.log('got a sync cmd!', data);

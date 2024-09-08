@@ -1,17 +1,24 @@
 import * as Flac from 'libflacjs/dist/libflac.dev.wasm';
 
+type EncoderWriteCallbackParams = Parameters<Flac.encoder_write_callback_fn>;
+type EncoderWriteCallbackReturn = ReturnType<Flac.encoder_write_callback_fn>;
+
 let flac_encoder,
   CHANNELS = 1,
   SAMPLERATE = 44100,
-  COMPRESSION = 5,
+  COMPRESSION = 0,
   BPS = 16,
   flac_ok = true,
   flacLength = 0;
 
 const BUFSIZE = 4096;
 const flacBuffers = [];
+let writeCallbackcounter = 0;
 
-function write_callback_fn(buffer, bytes) {
+function write_callback_fn(buffer) {
+  console.time(`encoded_${writeCallbackcounter}`);
+  console.timeEnd(`encoded_${writeCallbackcounter - 1}`);
+  writeCallbackcounter++;
   //console.log('flac-chunk!', buffer, bytes);
   self.postMessage({
     cmd: 'flac-chunk',

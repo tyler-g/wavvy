@@ -1,7 +1,7 @@
 import usePeerStore from '../stores/Peer';
 import useMixerStore from '../stores/Mixer';
 
-export const sendCmdToAllRemotePeers = (cmd: string, data: any) => {
+export const sendCmdToAllRemotePeers = (cmd: string, data: any = null) => {
   // send command to all connected remote peers
   const remotePeers = usePeerStore.getState().remote;
   if (!remotePeers.length) return;

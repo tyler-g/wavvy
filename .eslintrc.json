@@ -21,7 +21,12 @@
   },
   "plugins": ["react", "@typescript-eslint", "prettier"],
   "rules": {
-    "prettier/prettier": ["error"],
+    "prettier/prettier": [
+      "error",
+      {
+        "singleQuote": true
+      }
+    ],
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",

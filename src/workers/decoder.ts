@@ -17,16 +17,20 @@ const flacBuffers = [];
 const bufferedInputData = [];
 let flacLength = 0;
 
+let performanceIteration = 0;
+
 let decodingPaused = true; //<- add pause flag
 let dec_state = 0; //variable for storing current decoding state
 const MIN_DATA_DECODE_THRESHOLD = Math.max(1024, BUFSIZE / 2); //<- wait for buffer to have at least THRESHOLD before calling DECODE (again)
 
-function read_callback_fn(bufferSize) {
-  console.log(
-    'flac | decoder | read_callback_fn',
-    bufferSize,
-    bufferedInputData
-  );
+function read_callback_fn(bufferSize: number) {
+  // console.log(
+  //   'flac | decoder | read_callback_fn',
+  //   bufferSize,
+  //   bufferedInputData
+  // );
+
+  console.time(`decoded_${performanceIteration}`);
 
   if (!bufferedInputData.length) {
     return {
@@ -79,10 +83,12 @@ function read_callback_fn(bufferSize) {
   };
 }
 
-function write_callback_fn(buffer, blockMetadata) {
+function write_callback_fn(buffer: Uint8Array[], blockMetadata) {
+  console.timeEnd(`decoded_${performanceIteration}`);
+  performanceIteration++;
   // buffer is the decoded audio data, Uint8Array
   // buffer[0] 1st channel, buffer[1] 2nd channel (if exists)
-  console.log('flac | decoder | write_callback_fn', blockMetadata, buffer);
+  //console.log('flac | decoder | write_callback_fn', blockMetadata, buffer);
   self.postMessage({
     cmd: 'pcm-chunk',
     buf: buffer[0],
@@ -101,9 +107,9 @@ function write_callback_fn(buffer, blockMetadata) {
     sample_data = blockMetadata;
 
   //    decData.push(buffer[0]);//<- buffer data for 1st channel (i.e. mono)
-  decData.push(buffer[0]); //<- store complete "channels buffer" (for use in exportWavFile())
+  decData.push(buffer); //<- store complete "channels buffer" (for use in exportWavFile())
 
-  console.log('flac | decoder | write_callback_fn | decData', decData);
+  //console.log('flac | decoder | write_callback_fn | decData', decData);
 }
 
 function metadata_callback_fn(data) {
@@ -130,10 +136,10 @@ function doDecode(forceDecoding = false) {
     return;
   }
 
-  console.log(
-    'flac | decoder | doDecode | about to set decodingPaused=false',
-    decodingPaused
-  );
+  // console.log(
+  //   'flac | decoder | doDecode | about to set decodingPaused=false',
+  //   decodingPaused
+  // );
   decodingPaused = false;
 
   //request to decode data chunks until end-of-stream is reached (or decoding is paused):
@@ -141,18 +147,18 @@ function doDecode(forceDecoding = false) {
     flac_return =
       flac_return && Flac.FLAC__stream_decoder_process_single(flac_decoder);
     dec_state = Flac.FLAC__stream_decoder_get_state(flac_decoder);
-    console.log('flac | decoder | doDecode | dec_state', dec_state);
+    //console.log('flac | decoder | doDecode | dec_state', dec_state);
     let byteSum = 0;
     flacBuffers.forEach((uint8Arr) => {
       byteSum += uint8Arr.byteLength;
     });
-    console.log(
-      'flac | decoder | paused | variable state',
-      bufferedInputData,
-      flacBuffers,
-      `${byteSum / 1024 / 1024} MB`,
-      decData
-    );
+    // console.log(
+    //   'flac | decoder | paused | variable state',
+    //   bufferedInputData,
+    //   flacBuffers,
+    //   `${byteSum / 1024 / 1024} MB`,
+    //   decData
+    // );
   }
 }
 
@@ -188,7 +194,7 @@ function handleInit(e) {
 
 function handleDecode(e) {
   // peerjs sends as ArrayBuffer - need to convert to Uint8Array
-  console.log('handleDecode', e.data.buf);
+  //console.log('handleDecode', e.data.buf);
   const toUint8 = new Uint8Array(e.data.buf);
   // e.data.buf is the chunk we need to decode, and it must sit until FLAC calls the read callback, after which we must set the data into the supplied buffer and set the bytes pointer
   bufferedInputData.push(toUint8);
@@ -196,6 +202,29 @@ function handleDecode(e) {
   flacBuffers.push(toUint8);
   flacLength += toUint8.byteLength;
   doDecode();
+}
+
+function handleRecEnd() {
+  /*
+    at this point:
+    flacData is an array of the flac-encoded chunks (can be used for exporting a FLAC file)
+    decData is an array of the already decoded chunks (can be used directly as PCM data, or export to WAV)
+
+    NOTE - for a few ms the last few flac-chunks may still be coming in over the peer connection
+  */
+  //let buffer = null;
+  //flush buffered data, if there is still any:
+  doDecode(true); //<- enforce decoding, if buffered data size is less MIN_DATA_DECODE_THRESHOLD
+
+  //buffer = decData.splice(0, decData.length); //TODO: remember why this is needed instead of using decData directly?
+
+  flac_ok = flac_ok && Flac.FLAC__stream_decoder_finish(flac_decoder);
+  console.log('flac | decoder | rec-end', flac_ok, decData, decData);
+
+  self.postMessage({
+    cmd: 'export-wav',
+    buf: decData,
+  });
 }
 
 Flac.on('ready', function (event) {
@@ -216,7 +245,9 @@ export default (() => {
       case 'decode':
         handleDecode(e);
         break;
-
+      case 'rec-end':
+        handleRecEnd();
+        break;
       case 'finish':
         console.log('finish');
 

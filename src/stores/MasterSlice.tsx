@@ -1,12 +1,10 @@
 import { StateCreator } from 'zustand';
 import FlacEncoderWorker from '../workers/encoder?worker';
 import FlacDecoderWorker from '../workers/decoder?worker';
+import ExporterUtilWorker from '../workers/exporter?worker';
 import { sendCmdToAllRemotePeers } from '../utils/peer-utils';
 
-interface WorkerState {
-  encoder: Worker;
-  decoder: Worker;
-}
+import useMixerStore from './Mixer';
 
 interface MasterState {
   db: number;
@@ -17,14 +15,51 @@ interface MasterState {
 }
 
 export interface MasterSlice {
-  workers: WorkerState;
   master: MasterState;
-  setWorkerEncoder: (worker: Worker) => void;
-  setWorkerDecoder: (worker: Worker) => void;
   setupMasterAudioContext: () => void;
   setMasterVolumeWorkletNode: (node: AudioWorkletNode) => void;
   setPcmProcessorNode: (node: AudioWorkletNode) => void;
   setDb: (val: number) => void;
+}
+
+// TODO: move to util
+/**
+ *  create A-element for data BLOB
+ */
+function getDownloadLink(blob, filename, omitLinkLabel = false) {
+  const name = filename || 'output.wav';
+  const url = (window.URL || window.webkitURL).createObjectURL(blob);
+  const link = window.document.createElement('a');
+  link.href = url;
+  link.download = name;
+  if (!omitLinkLabel) {
+    link.textContent = name;
+  }
+  return link;
+}
+
+function forceDownload(blob, filename) {
+  const link = getDownloadLink(blob, filename, true);
+  //NOTE: FireFox requires a MouseEvent (in Chrome a simple Event would do the trick)
+  const click = document.createEvent('MouseEvent');
+  click.initMouseEvent(
+    'click',
+    true,
+    true,
+    window,
+    0,
+    0,
+    0,
+    0,
+    0,
+    false,
+    false,
+    false,
+    false,
+    0,
+    null
+  );
+  link.dispatchEvent(click);
 }
 
 export const createMasterSlice: StateCreator<
@@ -33,22 +68,6 @@ export const createMasterSlice: StateCreator<
   [],
   MasterSlice
 > = (set, get) => ({
-  workers: {
-    encoder: null,
-    decoder: null,
-  },
-  setWorkerEncoder: (worker) => {
-    set((state) => ({
-      workers: { ...state.workers, encoder: worker },
-    }));
-    console.log('setWorkerEncoder', worker);
-  },
-  setWorkerDecoder: (worker) => {
-    set((state) => ({
-      workers: { ...state.workers, decoder: worker },
-    }));
-    console.log('setWorkerDecoder', worker);
-  },
   master: {
     db: 0,
     audioContext: null,
@@ -57,13 +76,9 @@ export const createMasterSlice: StateCreator<
     pcmProcessorNode: null,
   },
   setupMasterAudioContext: async () => {
-    const {
-      setDb,
-      setMasterVolumeWorkletNode,
-      setPcmProcessorNode,
-      setWorkerEncoder,
-      setWorkerDecoder,
-    } = get();
+    const { setDb, setMasterVolumeWorkletNode, setPcmProcessorNode } = get();
+
+    const workerSlice = useMixerStore.getState();
 
     // set up master audio context and analyser
     const context = new AudioContext();
@@ -71,11 +86,13 @@ export const createMasterSlice: StateCreator<
     analyser.fftSize = 4096;
     analyser.connect(context.destination);
 
-    // set up flac encoder and decoder workers
+    // set up flac encoder and decoder workers, and exporter worker
     const flacEncoder = new FlacEncoderWorker();
     const flacDecoder = new FlacDecoderWorker();
+    const exporterUtil = new ExporterUtilWorker();
 
     // init must wait until Flac onready event
+    // TODO: do this without setTimeout
     setTimeout(() => {
       flacEncoder.postMessage({
         cmd: 'init',
@@ -84,6 +101,7 @@ export const createMasterSlice: StateCreator<
         cmd: 'init',
       });
     }, 2000);
+
     flacEncoder.onmessage = (e) => {
       if (!e.data?.cmd) return;
 
@@ -95,10 +113,41 @@ export const createMasterSlice: StateCreator<
           break;
       }
     };
+    flacDecoder.onmessage = (e) => {
+      if (!e.data?.cmd) return;
+
+      switch (e.data.cmd) {
+        case 'export-wav':
+          exporterUtil.postMessage({
+            cmd: 'export-wav',
+            buf: e.data.buf,
+          });
+      }
+    };
+    exporterUtil.onmessage = (e) => {
+      let track1WaveSurferInstance;
+      if (!e.data?.cmd) return;
+
+      switch (e.data.cmd) {
+        case 'wav-blob':
+          console.log('got wav blob from exporter worker!', e.data.wav);
+          forceDownload(e.data.wav, 'test.wav');
+
+          // for testing only
+          track1WaveSurferInstance =
+            useMixerStore.getState().tracks[0].wavesurfer;
+          track1WaveSurferInstance.loadBlob(e.data.wav);
+          console.log(
+            'track 1 duration',
+            track1WaveSurferInstance.getDuration()
+          );
+      }
+    };
 
     // save to state
-    setWorkerEncoder(flacEncoder);
-    setWorkerDecoder(flacDecoder);
+    workerSlice.setWorkerEncoder(flacEncoder);
+    workerSlice.setWorkerDecoder(flacDecoder);
+    workerSlice.setWorkerExporter(exporterUtil);
 
     set((state) => ({
       master: {
@@ -107,6 +156,8 @@ export const createMasterSlice: StateCreator<
         analyserNode: analyser,
       },
     }));
+
+    // set up audio worklets
     context.audioWorklet
       .addModule('src/worklets/volume-meter-processor.js')
       .then(async () => {
@@ -134,10 +185,16 @@ export const createMasterSlice: StateCreator<
         // we must receive the raw PCM data through onmessage, and on this
         // main thread, send it to the Flac Encoder Worker to be processed
         pcmProcessorNode.port.onmessage = ({ data }) => {
+          console.log('pcm msg', data);
           // send to flac encoder worker
           flacEncoder.postMessage({
             cmd: 'encode',
             buf: data,
+          });
+          // send to passthrough for other things that might need raw pcm data
+          exporterUtil.postMessage({
+            cmd: 'passthrough',
+            pcm: data,
           });
         };
         setPcmProcessorNode(pcmProcessorNode);

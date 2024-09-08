@@ -23,13 +23,15 @@ function AudioTrack({ id }: AudioTrackProps) {
     (state) => state.setTrackWaveSurferEventListener
   );
   const removeTrack = useMixerStore((state) => state.removeTrack);
-  const [volumeWorkletNode, pcmProcessorNode, audioContext] = useMixerStore(
-    useShallow((state) => [
-      state.master.volumeWorkletNode,
-      state.master.pcmProcessorNode,
-      state.master.audioContext,
-    ])
-  );
+  const [volumeWorkletNode, pcmProcessorNode, audioContext, exporterWorker] =
+    useMixerStore(
+      useShallow((state) => [
+        state.master.volumeWorkletNode,
+        state.master.pcmProcessorNode,
+        state.master.audioContext,
+        state.workers.exporter,
+      ])
+    );
 
   const trackWaveSurfer = useMixerStore(
     (state) => state.tracks.find((track) => track.id === id)?.wavesurfer
@@ -45,7 +47,9 @@ function AudioTrack({ id }: AudioTrackProps) {
         scrollingWaveform: true,
         renderRecordedAudio: true,
         scrollingWaveformWindow: 60,
+        audioBitsPerSecond: 8000,
         audioContext,
+        workerContext: exporterWorker,
       })
     );
     recordPlugin?.on('record-data-available', (blob) => {
@@ -134,6 +138,9 @@ function AudioTrack({ id }: AudioTrackProps) {
       sourceNode.disconnect(pcmProcessorNode);
       setIsRecording(false);
 
+      // let peers know the recording is stopped
+      // TODO: find a way to be sure all flac chunks have been sent out already before sending rec-end
+      sendCmdToAllRemotePeers('rec-end');
       return;
     }
     console.log('about to record');
